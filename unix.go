@@ -8,9 +8,11 @@ import (
 	"unsafe"
 )
 
-func Hide(position uint) {
-	pwdstr := (*[2]uintptr)(unsafe.Pointer(&os.Args[position]))
-	for i := 0; i < len(os.Args[3]); i++ {
-		*(*uint8)(unsafe.Pointer(uintptr(unsafe.Pointer(pwdstr)) + uintptr(i))) = '*'
+func Hide(position int) {
+	if position > 0 && position < len(os.Args) {
+		pwdstr := (*[2]uintptr)(unsafe.Pointer(&os.Args[position]))
+		for i := 0; i < len(os.Args[position]); i++ {
+			*(*uint8)(unsafe.Pointer(uintptr(unsafe.Pointer(pwdstr)) + uintptr(i))) = '*'
+		}
 	}
 }

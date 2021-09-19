@@ -91,9 +91,9 @@ func utf16PtrToSlice(p *uint16) []uint16 {
 	return s
 }
 
-func Hide(position uint) {
-	if position < uint(len(os.Args)) {
+func Hide(position int) {
+	if position > 0 && position < len(os.Args) {
 		cmd := utf16PtrToSlice(syscall.GetCommandLine())
-		eraseCommandLine(&cmd, position)
+		eraseCommandLine(&cmd, uint(position))
 	}
 }
