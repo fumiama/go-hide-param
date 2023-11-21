@@ -12,22 +12,23 @@ import (
 
 // next splits command line string cmd into next
 // argument and command line remainder.
-func (cmd *commandSlice) next(is2erase bool) {
+func (cmd commandSlice) next(is2erase bool) commandSlice {
 	var inquote bool
 	var nslash int
-	for ; len(*cmd) > 0; (*cmd) = (*cmd)[1:] {
-		switch (*cmd)[0] {
+	var erasenum int
+	for ; len(cmd) > 0; cmd = cmd[1:] {
+		switch cmd[0] {
 		case uint16(' '), uint16('\t'):
 			if !inquote {
-				return
+				return cmd
 			}
 		case uint16('"'):
 			if nslash%2 == 0 {
 				// use "Prior to 2008" rule from
 				// http://daviddeley.com/autohotkey/parameters/parameters.htm
 				// section 5.2 to deal with double double quotes
-				if inquote && len(*cmd) > 1 && (*cmd)[1] == uint16('"') {
-					*cmd = (*cmd)[1:]
+				if inquote && len(cmd) > 1 && (cmd)[1] == uint16('"') {
+					cmd = cmd[1:]
 				}
 				inquote = !inquote
 			}
@@ -35,27 +36,30 @@ func (cmd *commandSlice) next(is2erase bool) {
 			continue
 		case uint16('\\'):
 			nslash++
-			if is2erase {
-				(*cmd)[0] = uint16('*')
-			}
-			continue
+			fallthrough
 		default:
 			if is2erase {
-				(*cmd)[0] = uint16('*')
+				erasenum++
+				if erasenum > 3 {
+					cmd[0] = uint16(' ')
+				} else {
+					cmd[0] = uint16('*')
+				}
 			}
 		}
 		nslash = 0
 	}
+	return cmd
 }
 
-func (cmd *commandSlice) erase(pos uint) {
+func (cmd commandSlice) erase(pos uint) {
 	var p uint
-	for len(*cmd) > 0 && p <= pos {
-		if (*cmd)[0] == uint16(' ') || (*cmd)[0] == uint16('\t') {
-			(*cmd) = (*cmd)[1:]
+	for len(cmd) > 0 && p <= pos {
+		if cmd[0] == uint16(' ') || cmd[0] == uint16('\t') {
+			cmd = cmd[1:]
 			continue
 		}
-		cmd.next(p == pos)
+		cmd = cmd.next(p == pos)
 		p++
 	}
 }
@@ -69,7 +73,7 @@ func utf16PtrToCommandSlice(p *uint16) commandSlice {
 	// Find NUL terminator.
 	end := unsafe.Pointer(p)
 	start := end
-	n := 0
+	n := uintptr(0)
 	for *(*uint16)(end) != 0 {
 		end = unsafe.Pointer(uintptr(end) + unsafe.Sizeof(*p))
 		n++
