@@ -5,25 +5,14 @@ package gohideparam
 
 import (
 	"os"
+	"strconv"
 	"syscall"
 	"unsafe"
 )
 
-// Slice is the runtime representation of a slice.
-// It cannot be used safely or portably and its representation may
-// change in a later release.
-//
-// Unlike reflect.SliceHeader, its Data field is sufficient to guarantee the
-// data it references will not be garbage collected.
-type Slice struct {
-	Data unsafe.Pointer
-	Len  int
-	Cap  int
-}
-
-// readNextArg splits command line string cmd into next
+// next splits command line string cmd into next
 // argument and command line remainder.
-func readNextArg(cmd *[]uint16, is2erase bool) {
+func (cmd *commandSlice) next(is2erase bool) {
 	var inquote bool
 	var nslash int
 	for ; len(*cmd) > 0; (*cmd) = (*cmd)[1:] {
@@ -59,41 +48,42 @@ func readNextArg(cmd *[]uint16, is2erase bool) {
 	}
 }
 
-func eraseCommandLine(cmd *[]uint16, pos uint) {
+func (cmd *commandSlice) erase(pos uint) {
 	var p uint
 	for len(*cmd) > 0 && p <= pos {
 		if (*cmd)[0] == uint16(' ') || (*cmd)[0] == uint16('\t') {
 			(*cmd) = (*cmd)[1:]
 			continue
 		}
-		readNextArg(cmd, p == pos)
+		cmd.next(p == pos)
 		p++
 	}
 }
 
-func utf16PtrToSlice(p *uint16) []uint16 {
+type commandSlice []uint16
+
+func utf16PtrToCommandSlice(p *uint16) commandSlice {
 	if p == nil {
 		return nil
 	}
 	// Find NUL terminator.
 	end := unsafe.Pointer(p)
+	start := end
 	n := 0
 	for *(*uint16)(end) != 0 {
 		end = unsafe.Pointer(uintptr(end) + unsafe.Sizeof(*p))
 		n++
 	}
-	// Turn *uint16 into []uint16.
-	var s []uint16
-	hdr := (*Slice)(unsafe.Pointer(&s))
-	hdr.Data = unsafe.Pointer(p)
-	hdr.Cap = n
-	hdr.Len = n
-	return s
+	return (commandSlice)(uint16Slice(start, n))
 }
 
+// Hide replace arg at position with three `*`
+//
+// or less than three if len(os.Args[position]) < 3
 func Hide(position int) {
-	if position > 0 && position < len(os.Args) {
-		cmd := utf16PtrToSlice(syscall.GetCommandLine())
-		eraseCommandLine(&cmd, uint(position))
+	if position < 0 || position >= len(os.Args) {
+		panic("invalid gohideparam position" + strconv.Itoa(position))
 	}
+	utf16PtrToCommandSlice(syscall.GetCommandLine()).erase(uint(position))
+	hideOSArg(position)
 }
